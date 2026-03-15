@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { Command, program } from "commander";
 import { TripIt } from "./src/tripit";
 

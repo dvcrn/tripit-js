@@ -5,6 +5,7 @@ fnox.toml
 # output
 out
 dist
+bin/tripit.js
 *.tgz
 
 # code coverage
