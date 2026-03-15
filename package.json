@@ -1,6 +1,6 @@
 {
 	"name": "tripit",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -26,7 +26,7 @@
 		}
 	},
 	"bin": {
-		"tripit": "./bin/tripit.js"
+		"tripit": "bin/tripit.js"
 	},
 	"files": [
 		"bin",
