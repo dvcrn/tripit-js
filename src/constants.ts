@@ -9,6 +9,9 @@ export const API_BASE_URL = "https://api.tripit.com";
 export const REDIRECT_URI = "com.tripit://completeAuthorize";
 export const SCOPES = "offline_access email";
 
+// TripIt mobile app client ID (public, extracted from iOS/Android app)
+export const DEFAULT_CLIENT_ID = "e400234a-f684-11e7-9d05-9cb654932688";
+
 export const BROWSER_HEADERS = {
 	"User-Agent":
 		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0",

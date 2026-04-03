@@ -7,8 +7,8 @@ export interface CachedToken {
 }
 
 export interface TripItConfig {
-	clientId: string;
-	clientSecret: string;
+	clientId?: string;
+	clientSecret?: string;
 	username: string;
 	password: string;
 }

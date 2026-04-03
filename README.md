@@ -127,8 +127,6 @@ tripit trips delete <TRIP_UUID>
 import TripIt from "tripit";
 
 const client = new TripIt({
-  clientId: process.env.TRIPIT_CLIENT_ID!,
-  clientSecret: process.env.TRIPIT_CLIENT_SECRET!,
   username: process.env.TRIPIT_USERNAME!,
   password: process.env.TRIPIT_PASSWORD!,
 });
@@ -147,5 +145,7 @@ const created = await client.createTrip({
 
 console.log(created.Trip.uuid);
 ```
+
+`clientId` is optional. If omitted, the library uses the public TripIt mobile app client ID by default.
 
 The package also exports types from `src/types.ts`.

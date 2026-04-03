@@ -7,6 +7,7 @@ import {
 	BASE_URL,
 	BROWSER_HEADERS,
 	CACHE_DIR,
+	DEFAULT_CLIENT_ID,
 	REDIRECT_URI,
 	SCOPES,
 	TOKEN_CACHE_FILE,
@@ -148,11 +149,12 @@ async function exchangeCodeForToken(
 	code: string,
 	codeVerifier: string,
 ): Promise<any> {
+	const clientId = config.clientId ?? DEFAULT_CLIENT_ID;
 	const params = new URLSearchParams({
 		grant_type: "authorization_code",
 		code,
 		redirect_uri: REDIRECT_URI,
-		client_id: config.clientId,
+		client_id: clientId,
 		code_verifier: codeVerifier,
 	});
 
@@ -171,6 +173,7 @@ async function exchangeCodeForToken(
 }
 
 export async function authenticate(config: TripItConfig): Promise<string> {
+	const clientId = config.clientId ?? DEFAULT_CLIENT_ID;
 	const cached = loadCachedToken();
 	if (cached && cached.expiresAt > Date.now()) {
 		return cached.access_token;
@@ -197,7 +200,7 @@ export async function authenticate(config: TripItConfig): Promise<string> {
 
 	const authUrl =
 		`${BASE_URL}/auth/oauth2/authorize?` +
-		`client_id=${encodeURIComponent(config.clientId)}` +
+		`client_id=${encodeURIComponent(clientId)}` +
 		`&response_type=code` +
 		`&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
 		`&scope=${encodeURIComponent(SCOPES)}` +

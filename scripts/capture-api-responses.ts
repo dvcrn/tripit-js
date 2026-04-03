@@ -43,8 +43,6 @@ async function main(): Promise<void> {
 	};
 
 	const client = new TripIt({
-		clientId: requiredEnv("TRIPIT_CLIENT_ID"),
-		clientSecret: requiredEnv("TRIPIT_CLIENT_SECRET"),
 		username: requiredEnv("TRIPIT_USERNAME"),
 		password: requiredEnv("TRIPIT_PASSWORD"),
 	});
