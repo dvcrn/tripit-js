@@ -183,9 +183,6 @@ export async function authenticate(config: TripItConfig): Promise<string> {
 	const { CookieJar } = await import("tough-cookie");
 	const fetchWithCookie = fetchCookie(fetch, new CookieJar());
 
-	// Establish session
-	await fetchWithCookie(`${BASE_URL}/home`, { headers: BROWSER_HEADERS });
-
 	// PKCE setup
 	const codeVerifier = crypto.randomBytes(32).toString("hex");
 	const codeChallenge = crypto
