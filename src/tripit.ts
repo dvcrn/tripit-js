@@ -646,20 +646,39 @@ export class TripIt {
 			existingHotel.EndDateTime?.timezone ||
 			existingHotel.StartDateTime?.timezone;
 
+		// XSD-strict replace payload: only send required identifiers, datetimes,
+		// and fields the caller explicitly supplied. Round-tripping read-only or
+		// extraneous fields (display_name, is_client_traveler, is_purchased,
+		// Address when unchanged, etc.) causes the TripIt v2 replace API to
+		// reject the request with a 400 XSD validation error.
+		const addressOverride =
+			params.street !== undefined ||
+			params.city !== undefined ||
+			params.state !== undefined ||
+			params.zip !== undefined ||
+			params.country !== undefined
+				? orderObjectByKeys(
+						clean({
+							address: params.street ?? existingHotel.Address?.address,
+							city: params.city ?? existingHotel.Address?.city,
+							state: params.state ?? existingHotel.Address?.state,
+							zip: params.zip ?? existingHotel.Address?.zip,
+							country: params.country ?? existingHotel.Address?.country,
+						}),
+						ADDRESS_FIELD_ORDER,
+					)
+				: undefined;
+
 		const lodgingObject: Record<string, unknown> = {
 			uuid: existingHotel.uuid,
-			is_client_traveler: toBoolean(existingHotel.is_client_traveler),
-			display_name: existingHotel.display_name,
 			supplier_name:
 				params.hotelName ??
 				existingHotel.supplier_name ??
 				existingHotel.display_name,
-			supplier_conf_num:
-				params.supplierConfNum ?? existingHotel.supplier_conf_num,
-			booking_rate: params.bookingRate ?? existingHotel.booking_rate,
-			is_purchased: toBoolean(existingHotel.is_purchased),
-			notes: params.notes ?? existingHotel.notes,
-			total_cost: params.totalCost ?? existingHotel.total_cost,
+			supplier_conf_num: params.supplierConfNum,
+			booking_rate: params.bookingRate,
+			notes: params.notes,
+			total_cost: params.totalCost,
 			StartDateTime: {
 				date: params.checkInDate ?? existingHotel.StartDateTime?.date,
 				time:
@@ -674,16 +693,7 @@ export class TripIt {
 					existingHotel.EndDateTime?.time,
 				timezone: endTimezone,
 			},
-			Address: orderObjectByKeys(
-				clean({
-					address: params.street ?? existingHotel.Address?.address,
-					city: params.city ?? existingHotel.Address?.city,
-					state: params.state ?? existingHotel.Address?.state,
-					zip: params.zip ?? existingHotel.Address?.zip,
-					country: params.country ?? existingHotel.Address?.country,
-				}),
-				ADDRESS_FIELD_ORDER,
-			),
+			Address: addressOverride,
 		};
 
 		if (tripKey) {
@@ -877,16 +887,17 @@ export class TripIt {
 				params.segment?.serviceClass ?? existingSegment.service_class,
 		};
 
+		// XSD-strict replace payload: drop round-tripped read-only fields
+		// (is_client_traveler, is_purchased) — the API returns these as strings
+		// and the response of toBoolean() is a native JSON boolean, which fails
+		// the v2 replace XSD validator with a 400.
 		const airObject: Record<string, unknown> = {
 			uuid: existingFlight.uuid,
-			is_client_traveler: toBoolean(existingFlight.is_client_traveler),
 			display_name: params.displayName ?? existingFlight.display_name,
 			supplier_name: params.supplierName ?? existingFlight.supplier_name,
-			supplier_conf_num:
-				params.supplierConfNum ?? existingFlight.supplier_conf_num,
-			is_purchased: toBoolean(existingFlight.is_purchased),
-			notes: params.notes ?? existingFlight.notes,
-			total_cost: params.totalCost ?? existingFlight.total_cost,
+			supplier_conf_num: params.supplierConfNum,
+			notes: params.notes,
+			total_cost: params.totalCost,
 			Segment: [orderObjectByKeys(clean(segment), AIR_SEGMENT_FIELD_ORDER)],
 		};
 
@@ -1080,15 +1091,13 @@ export class TripIt {
 			carrier_name: params.carrierName ?? existingSegment.carrier_name,
 		};
 
+		// XSD-strict replace payload: drop round-tripped read-only booleans
+		// (is_client_traveler, is_purchased, is_tripit_booking,
+		// has_possible_cancellation). The API returns these as strings; native
+		// JSON booleans from toBoolean() fail the v2 replace XSD validator.
 		const transportObject: Record<string, unknown> = {
 			uuid: existingTransport.uuid,
-			is_client_traveler: toBoolean(existingTransport.is_client_traveler),
 			display_name: params.displayName ?? existingTransport.display_name,
-			is_purchased: toBoolean(existingTransport.is_purchased),
-			is_tripit_booking: toBoolean(existingTransport.is_tripit_booking),
-			has_possible_cancellation: toBoolean(
-				existingTransport.has_possible_cancellation,
-			),
 			Segment: [
 				orderObjectByKeys(clean(segment), TRANSPORT_SEGMENT_FIELD_ORDER),
 			],
@@ -1232,12 +1241,14 @@ export class TripIt {
 				: "trip_id"
 			: undefined;
 
+		// XSD-strict replace payload: drop round-tripped read-only booleans
+		// (is_client_traveler, is_purchased). The API returns these as strings;
+		// native JSON booleans from toBoolean() fail the v2 replace XSD
+		// validator with a 400.
 		const activityObject: Record<string, unknown> = {
 			uuid: existingActivity.uuid,
-			is_client_traveler: toBoolean(existingActivity.is_client_traveler),
 			display_name: params.displayName ?? existingActivity.display_name,
-			is_purchased: toBoolean(existingActivity.is_purchased),
-			notes: params.notes ?? existingActivity.notes,
+			notes: params.notes,
 			StartDateTime: {
 				date: params.startDate ?? existingActivity.StartDateTime?.date,
 				time:
