@@ -26,7 +26,7 @@ identity must be supplied through the configured secret mechanism, never committ
 
 ```sh
 tripit_test_home=$(mktemp -d)
-HOME="$tripit_test_home" TRIPIT_LIVE_TEST=1 bun test/live/reservations.ts
+fnox x -- env HOME="$tripit_test_home" TRIPIT_LIVE_TEST=1 bun test/live/reservations.ts
 ```
 
 Remove that temporary HOME after the run. The harness creates only synthetic
@@ -41,3 +41,9 @@ Both reservations and their parent trip were deleted and verified absent.
 Earlier failed fixture runs also completed and verified cleanup. No package was
 published. The in-process lock cannot prevent edits from other processes or the
 TripIt application; activity/air/transport update preservation is outside this change.
+
+CancellationDateTime preservation is covered with deterministic returned-object fixtures.
+The dev API accepted a synthetic cancellation timestamp but did not return it, so
+live cancellation round-trip behavior remains unverified. That seed run deleted
+and verified both reservations and its trip. Public hotel phone and hotel/car
+custom names are asserted against their requested values before preservation checks.

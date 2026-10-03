@@ -449,3 +449,53 @@ test("per-end timezone null overrides common timezone and clears only that end",
 	assert.equal(out.StartDateTime.timezone, undefined);
 	assert.equal(out.EndDateTime.timezone, "Etc/UTC");
 });
+
+test("hotel/car cancellation timestamps survive edits and document removal in schema order", () => {
+	for (const kind of ["car", "lodging"] as const) {
+		const existing = {
+			uuid: "reservation-1",
+			Image: { uuid: "image-1" },
+			CancellationDateTime: {
+				date: "2030-01-01",
+				time: "9:05",
+				timezone: "Etc/UTC",
+				utc_offset: "+00:00",
+				is_timezone_manual: "false",
+			},
+			booking_date: "2029-12-01",
+			notes: "old",
+		};
+		const out = mergeReplace(kind, existing, { notes: "new" });
+		assert.deepEqual(out.CancellationDateTime, {
+			date: "2030-01-01",
+			time: "09:05:00",
+			timezone: "Etc/UTC",
+		});
+		assert.deepEqual(Object.keys(out), [
+			"uuid",
+			"Image",
+			"CancellationDateTime",
+			"booking_date",
+			"notes",
+		]);
+		assert.deepEqual(
+			mergeReplace(kind, existing, { Image: null }).CancellationDateTime,
+			out.CancellationDateTime,
+		);
+		assert.throws(
+			() =>
+				mergeReplace(
+					kind,
+					{
+						...existing,
+						CancellationDateTime: {
+							...existing.CancellationDateTime,
+							unknown: "value",
+						},
+					},
+					{},
+				),
+			/CancellationDateTime.unknown/,
+		);
+	}
+});

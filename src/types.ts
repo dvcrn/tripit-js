@@ -44,6 +44,8 @@ export interface DateTimeValue {
 }
 
 export interface AddressValue {
+	addr1?: string;
+	addr2?: string;
 	address?: string;
 	city?: string;
 	state?: string;
@@ -135,7 +137,33 @@ export interface TripMutationResponse extends ApiMetadata {
 	WeatherObject?: OneOrMany<WeatherObject>;
 }
 
-export interface LodgingObject {
+export interface TravelerValue {
+	first_name?: string;
+	middle_name?: string;
+	last_name?: string;
+	frequent_traveler_num?: string;
+	frequent_traveler_supplier?: string;
+	meal_preference?: string;
+	seat_preference?: string;
+	ticket_num?: string;
+}
+
+export interface ReservationObject {
+	id?: string;
+	CancellationDateTime?: DateTimeValue;
+	booking_date?: string;
+	booking_site_conf_num?: string;
+	booking_site_name?: string;
+	booking_site_phone?: string;
+	booking_site_url?: string;
+	record_locator?: string;
+	supplier_contact?: string;
+	supplier_email_address?: string;
+	supplier_url?: string;
+	restrictions?: string;
+	ReservationHolder?: TravelerValue;
+	EstimatedStartDateTime?: DateTimeValue;
+	EstimatedEndDateTime?: DateTimeValue;
 	supplier_phone?: string;
 	uuid: string;
 	trip_uuid?: string;
@@ -155,9 +183,16 @@ export interface LodgingObject {
 	is_tripit_booking?: string;
 	has_possible_cancellation?: string;
 	is_concur_booked?: string;
+}
+
+export interface LodgingObject extends ReservationObject {
 	StartDateTime?: DateTimeValue;
 	EndDateTime?: DateTimeValue;
 	Address?: AddressValue;
+	Guest?: OneOrMany<TravelerValue>;
+	number_guests?: string;
+	number_rooms?: string;
+	room_type?: string;
 }
 
 export interface AirSegmentStatus {
@@ -337,7 +372,9 @@ export type UpdateCarParams = {
 	uuid?: string;
 	Image?: OneOrMany<TripImage> | null;
 } & { [K in keyof CarFields]?: CarFields[K] | null };
-export interface CarObject extends Omit<LodgingObject, "Address"> {
+export interface CarObject extends ReservationObject {
+	StartDateTime?: DateTimeValue;
+	EndDateTime?: DateTimeValue;
 	StartLocationAddress?: AddressValue;
 	EndLocationAddress?: AddressValue;
 	start_location_name?: string;
@@ -349,7 +386,7 @@ export interface CarObject extends Omit<LodgingObject, "Address"> {
 	car_description?: string;
 	car_type?: string;
 	mileage_charges?: string;
-	Driver?: OneOrMany<Record<string, string>>;
+	Driver?: OneOrMany<TravelerValue>;
 }
 export interface CarResponse extends ApiMetadata, WarningContainer {
 	CarObject: CarObject;

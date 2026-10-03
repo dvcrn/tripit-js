@@ -8,6 +8,7 @@ export type Kind = "car" | "lodging";
 // Writable reservation fields, in TripIt's XSD order (shared by every reservation type).
 const RESERVATION_FIELDS = [
 	"Image",
+	"CancellationDateTime",
 	"booking_date",
 	"booking_rate",
 	"booking_site_conf_num",
@@ -101,7 +102,11 @@ const TRAVELER_KEYS = [
 	"seat_preference",
 	"ticket_num",
 ];
-const DATETIME_FIELDS = new Set(["StartDateTime", "EndDateTime"]);
+const DATETIME_FIELDS = new Set([
+	"StartDateTime",
+	"EndDateTime",
+	"CancellationDateTime",
+]);
 // Nested keys TripIt returns, writable or read-only (utc_offset and is_timezone_manual it computes;
 // coordinates it geocodes). Any other nested key refuses the update, like an unknown top-level one.
 const NESTED_KNOWN: Record<string, Set<string>> = {};

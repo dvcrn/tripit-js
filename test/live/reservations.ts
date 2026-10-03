@@ -152,6 +152,13 @@ try {
 		phone: "+1 202 555 0100",
 		displayName: "Custom synthetic hotel",
 	});
+	const updatedHotel = (await client.getHotel(hotel.uuid)).LodgingObject;
+	assert.equal(updatedHotel.supplier_phone, "+1 202 555 0100");
+	assert.equal(updatedHotel.display_name, "Custom synthetic hotel");
+	assert.equal(
+		(await client.getCar(car.uuid)).CarObject.display_name,
+		"Custom synthetic car",
+	);
 	for (const { kind, id } of created) {
 		console.log(`RUN ${kind} attachment and edits`);
 		const get = async () =>
