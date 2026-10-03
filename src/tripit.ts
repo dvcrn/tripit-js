@@ -325,7 +325,9 @@ export class TripIt {
 					!/^API error \(404\)/.test(message) &&
 					!(
 						/^API error \(400\)/.test(message) &&
-						/not a[n]? .*object|not found|does not exist/i.test(message)
+						/not a[n]? .*object|not found|no .*found|does not exist|invalid.*(uuid|id)/i.test(
+							message,
+						)
 					)
 				)
 					throw error;
@@ -631,8 +633,6 @@ export class TripIt {
 		if (params.tripId === null) throw new Error("tripId cannot be cleared");
 		const identifier = params.uuid || params.id;
 		if (!identifier) throw new Error("Either uuid or id parameter is required");
-		const time = (value: string | null | undefined) =>
-			value === null ? null : normalizeTime(value || "");
 		const changes: Record<string, unknown> = {
 			display_name: params.displayName,
 			supplier_name: params.hotelName,
@@ -644,12 +644,12 @@ export class TripIt {
 			Image: params.Image,
 			StartDateTime: {
 				date: params.checkInDate,
-				time: time(params.checkInTime),
+				time: params.checkInTime,
 				timezone: params.timezone,
 			},
 			EndDateTime: {
 				date: params.checkOutDate,
-				time: time(params.checkOutTime),
+				time: params.checkOutTime,
 				timezone: params.timezone,
 			},
 			Address: {

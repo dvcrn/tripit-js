@@ -179,3 +179,31 @@ test("trip association cannot be silently cleared", async () => {
 		"tripId cannot be cleared",
 	);
 });
+
+test("type detection continues for recognized wrong-type and missing-object replies", async () => {
+	for (const message of [
+		"object is not a lodging object",
+		"no lodging found",
+		"invalid uuid",
+		"object not found",
+	]) {
+		const client = new TripIt({ username: "offline", password: "offline" });
+		Object.assign(client, {
+			apiGet: async (path: string) => {
+				if (path.includes("/lodging/"))
+					throw new Error(`API error (400): ${message}`);
+				return { CarObject: { uuid } };
+			},
+		});
+		expect(await client.detectObjectType(uuid)).toBe("car");
+	}
+});
+
+test("hotel updates pad single-digit hours and reject invalid times", async () => {
+	const f = fixture("lodging");
+	await f.client.updateHotel({ uuid, checkOutTime: "9:05" });
+	expect(f.object.EndDateTime.time).toBe("09:05:00");
+	await expect(
+		f.client.updateHotel({ uuid, checkOutTime: "25:00" }),
+	).rejects.toThrow("HH:MM");
+});
