@@ -36,14 +36,16 @@ export interface WarningContainer {
 }
 
 export interface DateTimeValue {
-	date: string;
-	time: string;
-	timezone: string;
+	date?: string;
+	time?: string;
+	timezone?: string;
 	utc_offset?: string;
 	is_timezone_manual?: string;
 }
 
 export interface AddressValue {
+	addr1?: string;
+	addr2?: string;
 	address?: string;
 	city?: string;
 	state?: string;
@@ -95,7 +97,7 @@ export interface WeatherObject {
 	trip_uuid?: string;
 	is_client_traveler?: string;
 	display_name?: string;
-	is_display_name_auto_generated?: string;
+	is_display_name_auto_generated?: string | boolean;
 	last_modified?: string;
 	date?: string;
 	location?: string;
@@ -135,7 +137,47 @@ export interface TripMutationResponse extends ApiMetadata {
 	WeatherObject?: OneOrMany<WeatherObject>;
 }
 
-export interface LodgingObject {
+export interface TravelerValue {
+	first_name?: string;
+	middle_name?: string;
+	last_name?: string;
+	frequent_traveler_num?: string;
+	frequent_traveler_supplier?: string;
+	meal_preference?: string;
+	seat_preference?: string;
+	ticket_num?: string;
+}
+
+export interface AgencyValue {
+	agency_conf_num?: string;
+	agency_name?: string;
+	agency_client_name?: string;
+	agency_phone?: string;
+	agency_email_address?: string;
+	agency_url?: string;
+	agency_contact?: string;
+	partner_agency_id?: string;
+}
+
+export interface ReservationObject {
+	Agency?: AgencyValue;
+	id?: string;
+	CancellationDateTime?: DateTimeValue;
+	booking_date?: string;
+	booking_site_conf_num?: string;
+	booking_site_name?: string;
+	booking_site_phone?: string;
+	booking_site_email_address?: string;
+	booking_site_url?: string;
+	record_locator?: string;
+	supplier_contact?: string;
+	supplier_email_address?: string;
+	supplier_url?: string;
+	restrictions?: string;
+	ReservationHolder?: TravelerValue;
+	EstimatedStartDateTime?: DateTimeValue;
+	EstimatedEndDateTime?: DateTimeValue;
+	supplier_phone?: string;
 	uuid: string;
 	trip_uuid?: string;
 	trip_id?: string;
@@ -143,7 +185,7 @@ export interface LodgingObject {
 	relative_url?: string;
 	display_name?: string;
 	Image?: OneOrMany<TripImage>;
-	is_display_name_auto_generated?: string;
+	is_display_name_auto_generated?: string | boolean;
 	last_modified?: string;
 	supplier_name?: string;
 	supplier_conf_num?: string;
@@ -154,9 +196,16 @@ export interface LodgingObject {
 	is_tripit_booking?: string;
 	has_possible_cancellation?: string;
 	is_concur_booked?: string;
+}
+
+export interface LodgingObject extends ReservationObject {
 	StartDateTime?: DateTimeValue;
 	EndDateTime?: DateTimeValue;
 	Address?: AddressValue;
+	Guest?: OneOrMany<TravelerValue>;
+	number_guests?: string;
+	number_rooms?: string;
+	room_type?: string;
 }
 
 export interface AirSegmentStatus {
@@ -206,7 +255,7 @@ export interface AirObject {
 	relative_url?: string;
 	display_name?: string;
 	Image?: OneOrMany<TripImage>;
-	is_display_name_auto_generated?: string;
+	is_display_name_auto_generated?: string | boolean;
 	last_modified?: string;
 	supplier_name?: string;
 	supplier_conf_num?: string;
@@ -240,7 +289,7 @@ export interface TransportObject {
 	relative_url?: string;
 	display_name?: string;
 	Image?: OneOrMany<TripImage>;
-	is_display_name_auto_generated?: string;
+	is_display_name_auto_generated?: string | boolean;
 	last_modified?: string;
 	is_purchased?: string;
 	is_tripit_booking?: string;
@@ -257,7 +306,7 @@ export interface ActivityObject {
 	relative_url?: string;
 	display_name?: string;
 	Image?: OneOrMany<TripImage>;
-	is_display_name_auto_generated?: string;
+	is_display_name_auto_generated?: string | boolean;
 	last_modified?: string;
 	is_purchased?: string;
 	notes?: string;
@@ -271,6 +320,7 @@ export interface ActivityObject {
 }
 
 export interface TripGetResponse extends ApiMetadata {
+	CarObject?: OneOrMany<CarObject>;
 	Trip: TripRecord;
 	WeatherObject?: OneOrMany<WeatherObject>;
 	AirObject?: OneOrMany<AirObject>;
@@ -293,4 +343,64 @@ export interface TransportResponse extends ApiMetadata, WarningContainer {
 
 export interface ActivityResponse extends ApiMetadata, WarningContainer {
 	ActivityObject: ActivityObject;
+}
+
+export interface CarFields {
+	tripId?: string;
+	displayName?: string;
+	supplierName?: string;
+	supplierConfNum?: string;
+	pickupDate?: string;
+	pickupTime?: string;
+	pickupTimezone?: string;
+	dropoffDate?: string;
+	dropoffTime?: string;
+	dropoffTimezone?: string;
+	timezone?: string;
+	pickupLocationName?: string;
+	pickupAddress?: string;
+	pickupCity?: string;
+	pickupState?: string;
+	pickupZip?: string;
+	pickupCountry?: string;
+	dropoffLocationName?: string;
+	dropoffAddress?: string;
+	dropoffCity?: string;
+	dropoffState?: string;
+	dropoffZip?: string;
+	dropoffCountry?: string;
+	carType?: string;
+	carDescription?: string;
+	totalCost?: string;
+	notes?: string;
+}
+export type CreateCarParams = CarFields & {
+	tripId: string;
+	supplierName: string;
+	pickupDate: string;
+	dropoffDate: string;
+};
+export type UpdateCarParams = {
+	id?: string;
+	uuid?: string;
+	Image?: OneOrMany<TripImage> | null;
+} & { [K in keyof CarFields]?: CarFields[K] | null };
+export interface CarObject extends ReservationObject {
+	StartDateTime?: DateTimeValue;
+	EndDateTime?: DateTimeValue;
+	StartLocationAddress?: AddressValue;
+	EndLocationAddress?: AddressValue;
+	start_location_name?: string;
+	end_location_name?: string;
+	start_location_hours?: string;
+	end_location_hours?: string;
+	start_location_phone?: string;
+	end_location_phone?: string;
+	car_description?: string;
+	car_type?: string;
+	mileage_charges?: string;
+	Driver?: OneOrMany<TravelerValue>;
+}
+export interface CarResponse extends ApiMetadata, WarningContainer {
+	CarObject: CarObject;
 }

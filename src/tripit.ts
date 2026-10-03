@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import fetch from "node-fetch";
 import { authenticate } from "./auth";
+import { carChanges } from "./car-params";
 import {
 	ACTIVITY_FIELD_ORDER,
 	ADDRESS_FIELD_ORDER,
@@ -13,10 +14,19 @@ import {
 	TRANSPORT_SEGMENT_FIELD_ORDER,
 	TRIP_UPDATE_FIELD_ORDER,
 } from "./constants";
+import { withObjectLock } from "./object-lock";
+import {
+	remainingImages as filterRemainingImages,
+	type Kind,
+	mergeReplace,
+	writable,
+} from "./reservation-payloads";
 import type {
 	ActivityResponse,
 	AirResponse,
 	AirSegment,
+	CarResponse,
+	CreateCarParams,
 	DeleteResponse,
 	LodgingResponse,
 	OneOrMany,
@@ -27,6 +37,7 @@ import type {
 	TripItConfig,
 	TripListResponse,
 	TripMutationResponse,
+	UpdateCarParams,
 } from "./types";
 import {
 	clean,
@@ -85,8 +96,14 @@ export class TripIt {
 	): string {
 		const isUuid = id.includes("-");
 		return isUuid
-			? this.endpoint("v2", `${action}/${resource}/uuid/${id}`)
-			: this.endpoint("v1", `${action}/${resource}/id/${id}`);
+			? this.endpoint(
+					"v2",
+					`${action}/${resource}/uuid/${encodeURIComponent(id)}`,
+				)
+			: this.endpoint(
+					"v1",
+					`${action}/${resource}/id/${encodeURIComponent(id)}`,
+				);
 	}
 
 	private async apiGet<TResponse>(path: string): Promise<TResponse> {
@@ -289,10 +306,11 @@ export class TripIt {
 
 	async detectObjectType(
 		id: string,
-	): Promise<"lodging" | "activity" | "air" | "transport"> {
-		const types = ["lodging", "activity", "air", "transport"] as const;
+	): Promise<"lodging" | "activity" | "air" | "transport" | "car"> {
+		const types = ["lodging", "car", "activity", "air", "transport"] as const;
 		const getters: Record<string, (id: string) => Promise<unknown>> = {
 			lodging: (id) => this.getHotel(id),
+			car: (id) => this.getCar(id),
 			activity: (id) => this.getActivity(id),
 			air: (id) => this.getFlight(id),
 			transport: (id) => this.getTransport(id),
@@ -301,7 +319,19 @@ export class TripIt {
 			try {
 				await getters[type]!(id);
 				return type;
-			} catch {}
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (
+					!/^API error \(404\)/.test(message) &&
+					!(
+						/^API error \(400\)/.test(message) &&
+						/not a[n]? .*object|not found|no .*found|does not exist|invalid.*(uuid|id)/i.test(
+							message,
+						)
+					)
+				)
+					throw error;
+			}
 		}
 		throw new Error(
 			`Could not find object with identifier ${id} as any supported type`,
@@ -309,13 +339,17 @@ export class TripIt {
 	}
 
 	async attachDocument(params: {
-		objectType?: "lodging" | "activity" | "air" | "transport";
+		objectType?: "lodging" | "activity" | "air" | "transport" | "car";
 		objectId: string;
 		filePath: string;
 		caption?: string;
 		mimeType?: string;
 	}): Promise<
-		LodgingResponse | ActivityResponse | AirResponse | TransportResponse
+		| CarResponse
+		| LodgingResponse
+		| ActivityResponse
+		| AirResponse
+		| TransportResponse
 	> {
 		const objectType =
 			params.objectType || (await this.detectObjectType(params.objectId));
@@ -326,17 +360,17 @@ export class TripIt {
 			mimeType: params.mimeType,
 		});
 
-		if (objectType === "lodging") {
-			const existingHotelResponse = await this.getHotel(params.objectId);
-			const existingHotel = existingHotelResponse.LodgingObject;
-			if (!existingHotel?.uuid) {
-				throw new Error(`Hotel with identifier ${params.objectId} not found`);
-			}
-
-			return this.updateHotel({
-				uuid: existingHotel.uuid,
-				Image: this.mergeImages(existingHotel.Image, newImage),
-			});
+		if (objectType === "lodging" || objectType === "car") {
+			return this.mutateReservation<CarResponse | LodgingResponse>(
+				objectType,
+				params.objectId,
+				(existing) => ({
+					Image: this.mergeImages(
+						existing.Image as OneOrMany<TripImage> | undefined,
+						newImage,
+					),
+				}),
+			);
 		}
 
 		if (objectType === "activity") {
@@ -396,7 +430,7 @@ export class TripIt {
 	}
 
 	async removeDocument(params: {
-		objectType?: "lodging" | "activity" | "air" | "transport";
+		objectType?: "lodging" | "activity" | "air" | "transport" | "car";
 		objectId: string;
 		imageUuid?: string;
 		imageUrl?: string;
@@ -404,7 +438,11 @@ export class TripIt {
 		index?: number;
 		removeAll?: boolean;
 	}): Promise<
-		LodgingResponse | ActivityResponse | AirResponse | TransportResponse
+		| CarResponse
+		| LodgingResponse
+		| ActivityResponse
+		| AirResponse
+		| TransportResponse
 	> {
 		const objectType =
 			params.objectType || (await this.detectObjectType(params.objectId));
@@ -423,63 +461,15 @@ export class TripIt {
 		}
 
 		const selectRemainingImages = (
-			currentImages: OneOrMany<TripImage> | undefined,
-		): TripImage[] => {
-			const images = normalizeArray(currentImages) as TripImage[];
-			if (images.length === 0) {
-				throw new Error(
-					`No documents found on ${objectType} ${params.objectId}`,
-				);
-			}
-
-			if (params.removeAll) {
-				return [];
-			}
-
-			if (params.imageUuid) {
-				const remaining = images.filter(
-					(image) => image.uuid !== params.imageUuid,
-				);
-				if (remaining.length === images.length) {
-					throw new Error(
-						`No document found with UUID ${params.imageUuid} on ${objectType} ${params.objectId}`,
-					);
-				}
-				return remaining;
-			}
-
-			if (params.imageUrl) {
-				const remaining = images.filter(
-					(image) => image.url !== params.imageUrl,
-				);
-				if (remaining.length === images.length) {
-					throw new Error(
-						`No document found with URL ${params.imageUrl} on ${objectType} ${params.objectId}`,
-					);
-				}
-				return remaining;
-			}
-
-			if (params.caption) {
-				const removeIndex = images.findIndex(
-					(image) => image.caption === params.caption,
-				);
-				if (removeIndex < 0) {
-					throw new Error(
-						`No document found with caption '${params.caption}' on ${objectType} ${params.objectId}`,
-					);
-				}
-				return images.filter((_, index) => index !== removeIndex);
-			}
-
-			const index = (params.index ?? 1) - 1;
-			if (index < 0 || index >= images.length) {
-				throw new Error(
-					`Document index out of range. Expected 1-${images.length}, got ${params.index}`,
-				);
-			}
-			return images.filter((_, i) => i !== index);
-		};
+			images: OneOrMany<TripImage> | undefined,
+		): TripImage[] =>
+			filterRemainingImages(images, {
+				uuid: params.imageUuid,
+				url: params.imageUrl,
+				caption: params.caption,
+				index: params.index,
+				all: params.removeAll,
+			}) as TripImage[];
 
 		const toImageField = (
 			remainingImages: TripImage[],
@@ -490,18 +480,16 @@ export class TripIt {
 				: remainingImages;
 		};
 
-		if (objectType === "lodging") {
-			const existingHotelResponse = await this.getHotel(params.objectId);
-			const existingHotel = existingHotelResponse.LodgingObject;
-			if (!existingHotel?.uuid) {
-				throw new Error(`Hotel with identifier ${params.objectId} not found`);
-			}
-			const remainingImages = selectRemainingImages(existingHotel.Image);
-			const imageField = toImageField(remainingImages);
-			return this.updateHotel(
-				imageField
-					? { uuid: existingHotel.uuid, Image: imageField }
-					: { uuid: existingHotel.uuid },
+		if (objectType === "lodging" || objectType === "car") {
+			return this.mutateReservation<CarResponse | LodgingResponse>(
+				objectType,
+				params.objectId,
+				(existing) => {
+					const remaining = selectRemainingImages(
+						existing.Image as OneOrMany<TripImage> | undefined,
+					);
+					return { Image: remaining.length ? remaining : null };
+				},
 			);
 		}
 
@@ -622,128 +610,119 @@ export class TripIt {
 	async updateHotel(params: {
 		id?: string;
 		uuid?: string;
-		tripId?: string;
-		hotelName?: string;
-		checkInDate?: string;
-		checkInTime?: string;
-		checkOutDate?: string;
-		checkOutTime?: string;
-		timezone?: string;
-		street?: string;
-		city?: string;
-		state?: string;
-		zip?: string;
-		country?: string;
-		supplierConfNum?: string;
-		bookingRate?: string;
-		notes?: string;
-		totalCost?: string;
-		Image?: OneOrMany<TripImage>;
+		tripId?: string | null;
+		hotelName?: string | null;
+		checkInDate?: string | null;
+		checkInTime?: string | null;
+		checkOutDate?: string | null;
+		checkOutTime?: string | null;
+		timezone?: string | null;
+		street?: string | null;
+		city?: string | null;
+		state?: string | null;
+		zip?: string | null;
+		country?: string | null;
+		supplierConfNum?: string | null;
+		bookingRate?: string | null;
+		notes?: string | null;
+		totalCost?: string | null;
+		Image?: OneOrMany<TripImage> | null;
+		displayName?: string | null;
+		phone?: string | null;
 	}): Promise<LodgingResponse> {
+		if (params.tripId === null) throw new Error("tripId cannot be cleared");
 		const identifier = params.uuid || params.id;
-		if (!identifier) {
-			throw new Error("Either uuid or id parameter is required");
-		}
-
-		const existingHotelResponse = await this.getHotel(identifier);
-		const existingHotel = existingHotelResponse.LodgingObject;
-		if (!existingHotel?.uuid) {
-			throw new Error(`Hotel with identifier ${identifier} not found`);
-		}
-
-		const tripId =
-			params.tripId || existingHotel.trip_uuid || existingHotel.trip_id;
-		const tripKey = tripId
-			? tripId.includes("-")
-				? "trip_uuid"
-				: "trip_id"
-			: undefined;
-
-		const startTimezone =
-			params.timezone ||
-			existingHotel.StartDateTime?.timezone ||
-			existingHotel.EndDateTime?.timezone;
-		const endTimezone =
-			params.timezone ||
-			existingHotel.EndDateTime?.timezone ||
-			existingHotel.StartDateTime?.timezone;
-
-		// XSD-strict replace payload: only send required identifiers, datetimes,
-		// and fields the caller explicitly supplied. Round-tripping read-only or
-		// extraneous fields (display_name, is_client_traveler, is_purchased,
-		// Address when unchanged, etc.) causes the TripIt v2 replace API to
-		// reject the request with a 400 XSD validation error.
-		const addressOverride =
-			params.street !== undefined ||
-			params.city !== undefined ||
-			params.state !== undefined ||
-			params.zip !== undefined ||
-			params.country !== undefined
-				? orderObjectByKeys(
-						clean({
-							address: params.street ?? existingHotel.Address?.address,
-							city: params.city ?? existingHotel.Address?.city,
-							state: params.state ?? existingHotel.Address?.state,
-							zip: params.zip ?? existingHotel.Address?.zip,
-							country: params.country ?? existingHotel.Address?.country,
-						}),
-						ADDRESS_FIELD_ORDER,
-					)
-				: undefined;
-
-		const lodgingObject: Record<string, unknown> = {
-			uuid: existingHotel.uuid,
-			supplier_name:
-				params.hotelName ??
-				existingHotel.supplier_name ??
-				existingHotel.display_name,
+		if (!identifier) throw new Error("Either uuid or id parameter is required");
+		const changes: Record<string, unknown> = {
+			display_name: params.displayName,
+			supplier_name: params.hotelName,
 			supplier_conf_num: params.supplierConfNum,
+			supplier_phone: params.phone,
 			booking_rate: params.bookingRate,
 			notes: params.notes,
 			total_cost: params.totalCost,
+			Image: params.Image,
 			StartDateTime: {
-				date: params.checkInDate ?? existingHotel.StartDateTime?.date,
-				time:
-					normalizeTime(params.checkInTime || "") ??
-					existingHotel.StartDateTime?.time,
-				timezone: startTimezone,
+				date: params.checkInDate,
+				time: params.checkInTime,
+				timezone: params.timezone,
 			},
 			EndDateTime: {
-				date: params.checkOutDate ?? existingHotel.EndDateTime?.date,
-				time:
-					normalizeTime(params.checkOutTime || "") ??
-					existingHotel.EndDateTime?.time,
-				timezone: endTimezone,
+				date: params.checkOutDate,
+				time: params.checkOutTime,
+				timezone: params.timezone,
 			},
-			Address: addressOverride,
+			Address: {
+				address: params.street,
+				city: params.city,
+				state: params.state,
+				zip: params.zip,
+				country: params.country,
+			},
+		};
+		if (params.tripId) {
+			const key = params.tripId.includes("-") ? "trip_uuid" : "trip_id";
+			changes[key] = params.tripId;
+			changes[key === "trip_uuid" ? "trip_id" : "trip_uuid"] = null;
+		}
+		return this.mutateReservation<LodgingResponse>(
+			"lodging",
+			identifier,
+			() => changes,
+		);
+	}
+
+	async getCar(id: string): Promise<CarResponse> {
+		return this.apiGet(this.identifierEndpoint("get", "car", id));
+	}
+
+	async deleteCar(id: string): Promise<DeleteResponse> {
+		return this.apiGet(this.identifierEndpoint("delete", "car", id));
+	}
+
+	async createCar(params: CreateCarParams): Promise<CarResponse> {
+		return this.apiPost(this.endpoint("v2", "create/car"), {
+			CarObject: writable("car", carChanges(params, true)),
+		});
+	}
+
+	async updateCar(params: UpdateCarParams): Promise<CarResponse> {
+		const identifier = params.uuid || params.id;
+		if (!identifier) throw new Error("Either uuid or id parameter is required");
+		return this.mutateReservation<CarResponse>("car", identifier, () =>
+			carChanges(params, false),
+		);
+	}
+
+	private async mutateReservation<T>(
+		kind: Kind,
+		id: string,
+		changes: (existing: Record<string, unknown>) => Record<string, unknown>,
+	): Promise<T> {
+		const objectKey = kind === "car" ? "CarObject" : "LodgingObject";
+		const read = async (identifier: string) => {
+			const response = await this.apiGet<Record<string, unknown>>(
+				this.identifierEndpoint("get", kind, identifier),
+			);
+			const value = response[objectKey];
+			const object = (Array.isArray(value) ? value[0] : value) as
+				| Record<string, unknown>
+				| undefined;
+			if (!object || typeof object.uuid !== "string")
+				throw new Error(`No ${objectKey} with identifier ${identifier}`);
+			return object;
 		};
 
-		if (tripKey) {
-			lodgingObject[tripKey] = tripId;
-		}
+		const uuid = (
+			id.includes("-") ? id : String((await read(id)).uuid)
+		).toLowerCase();
 
-		if (params.Image) {
-			if (Array.isArray(params.Image)) {
-				lodgingObject.Image = params.Image.map((image) => {
-					if (!image.ImageData) return image;
-					return orderObjectByKeys(image, IMAGE_FIELD_ORDER);
-				});
-			} else {
-				lodgingObject.Image = params.Image.ImageData
-					? orderObjectByKeys(params.Image, IMAGE_FIELD_ORDER)
-					: params.Image;
-			}
-		}
-
-		return this.apiPost(
-			this.endpoint("v2", `replace/lodging/uuid/${existingHotel.uuid}`),
-			{
-				LodgingObject: orderObjectByKeys(
-					clean(lodgingObject),
-					LODGING_FIELD_ORDER,
-				),
-			},
-		);
+		return withObjectLock(`${kind}:${uuid}`, async () => {
+			const existing = await read(uuid);
+			return this.apiPost<T>(this.identifierEndpoint("replace", kind, uuid), {
+				[objectKey]: mergeReplace(kind, existing, changes(existing)),
+			});
+		});
 	}
 
 	// === Flights (Air) ===
