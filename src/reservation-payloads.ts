@@ -69,8 +69,7 @@ export const LODGING_FIELDS: readonly string[] = [
 	"room_type",
 ];
 
-// What TripIt returns but never accepts back (sending them gets a 400) or computes itself.
-// display_name is writable but only kept while custom (see mergeReplace).
+// Omit server-computed fields; mergeReplace handles custom display names.
 const READ_ONLY_FIELDS = new Set([
 	"id",
 	"relative_url",
@@ -118,8 +117,7 @@ const DATETIME_FIELDS = new Set([
 	"EndDateTime",
 	"CancellationDateTime",
 ]);
-// Nested keys TripIt returns, writable or read-only (utc_offset and is_timezone_manual it computes;
-// coordinates it geocodes). Any other nested key refuses the update, like an unknown top-level one.
+// Unknown nested fields block replacement to avoid silently discarding data.
 const NESTED_KNOWN: Record<string, Set<string>> = {
 	Agency: new Set([...AGENCY_KEYS, "partner_agency_id"]),
 };
@@ -135,13 +133,13 @@ for (const f of DATETIME_FIELDS)
 		"utc_offset",
 		"is_timezone_manual",
 	]);
-for (const f of ["Address", "StartLocationAddress", "EndLocationAddress"]) {
+for (const f of ADDRESS_FIELDS) {
 	NESTED_KNOWN[f] = new Set([
 		...ADDRESS_KEYS,
 		"latitude",
 		"longitude",
 		"risk_level",
-	]); // risk_level: TripIt's rating
+	]);
 }
 for (const f of TRAVELER_FIELDS) NESTED_KNOWN[f] = new Set(TRAVELER_KEYS);
 
@@ -176,13 +174,16 @@ function pick(
 
 function writableValue(field: string, value: unknown): unknown {
 	if (field === "Agency" && isPlain(value)) return pick(value, AGENCY_KEYS);
+
 	if (DATETIME_FIELDS.has(field) && isPlain(value)) {
 		return pick(value, DATETIME_KEYS, (k, v) =>
 			k === "time" ? normalizeTime(v as string | undefined) : v,
 		);
 	}
+
 	if (ADDRESS_FIELDS.has(field) && isPlain(value))
 		return pick(value, ADDRESS_KEYS);
+
 	if (TRAVELER_FIELDS.has(field)) {
 		if (Array.isArray(value)) {
 			const list = value
@@ -193,20 +194,21 @@ function writableValue(field: string, value: unknown): unknown {
 		}
 		return isPlain(value) ? pick(value, TRAVELER_KEYS) : undefined;
 	}
+
 	if (field === "Image" && value) {
 		const images = Array.isArray(value) ? value : [value];
-		const ordered = images.map((image) =>
-			isPlain(image) && image.ImageData
-				? Object.fromEntries(
-						IMAGE_FIELD_ORDER.filter((k) => image[k] !== undefined).map((k) => [
-							k,
-							image[k],
-						]),
-					)
-				: image,
-		);
+		const ordered = images.map((image) => {
+			if (!isPlain(image) || !image.ImageData) return image;
+
+			return Object.fromEntries(
+				IMAGE_FIELD_ORDER.filter((key) => image[key] !== undefined).map(
+					(key) => [key, image[key]],
+				),
+			);
+		});
 		return Array.isArray(value) ? ordered : ordered[0];
 	}
+
 	return value;
 }
 
@@ -237,6 +239,7 @@ export function mergeReplace(kind: Kind, existing: Obj, changes: Obj): Obj {
 	const unknown = Object.keys(existing).filter(
 		(k) => !fields.includes(k) && !READ_ONLY_FIELDS.has(k),
 	);
+
 	for (const [field, value] of Object.entries(existing)) {
 		const known = NESTED_KNOWN[field];
 		if (!known) continue;
@@ -246,18 +249,21 @@ export function mergeReplace(kind: Kind, existing: Obj, changes: Obj): Obj {
 				if (!known.has(k)) unknown.push(`${field}.${k}`);
 		}
 	}
+
 	if (unknown.length) {
 		throw new Error(
 			`Not updated: this ${kind === "car" ? "car rental" : "hotel"} has field(s) this library does not know how ` +
 				`to keep (${unknown.sort().join(", ")}), and an update would wipe them. Edit it in the TripIt app instead.`,
 		);
 	}
+
 	const base: Obj = { ...existing };
 	if (
 		base.is_display_name_auto_generated !== "false" &&
 		base.is_display_name_auto_generated !== false
 	)
 		delete base.display_name;
+
 	return writable(kind, deepMerge(base, changes));
 }
 
@@ -281,24 +287,28 @@ export function remainingImages(
 				: [images as Obj];
 	if (list.length === 0) throw new Error("No documents found on this object");
 	if (sel.all) return [];
+
 	if (sel.uuid) {
 		const rest = list.filter((i) => i.uuid !== sel.uuid);
 		if (rest.length === list.length)
 			throw new Error(`No document found with UUID ${sel.uuid}`);
 		return rest;
 	}
+
 	if (sel.url) {
 		const rest = list.filter((i) => i.url !== sel.url);
 		if (rest.length === list.length)
 			throw new Error(`No document found with URL ${sel.url}`);
 		return rest;
 	}
+
 	if (sel.caption) {
 		const at = list.findIndex((i) => i.caption === sel.caption);
 		if (at < 0)
 			throw new Error(`No document found with caption '${sel.caption}'`);
 		return list.filter((_, n) => n !== at);
 	}
+
 	const at = (sel.index ?? 1) - 1;
 	if (!Number.isInteger(at) || at < 0 || at >= list.length) {
 		throw new Error(

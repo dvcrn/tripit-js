@@ -712,9 +712,11 @@ export class TripIt {
 				throw new Error(`No ${objectKey} with identifier ${identifier}`);
 			return object;
 		};
+
 		const uuid = (
 			id.includes("-") ? id : String((await read(id)).uuid)
 		).toLowerCase();
+
 		return withObjectLock(`${kind}:${uuid}`, async () => {
 			const existing = await read(uuid);
 			return this.apiPost<T>(this.identifierEndpoint("replace", kind, uuid), {
