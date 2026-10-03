@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { TripIt } from "../src/tripit";
 
-const uuid = "11111111-2222-9000-0004-000000000001";
+const uuid = "abcdefab-2222-9000-0004-000000000001";
 function fixture(kind: "car" | "lodging") {
 	const client = new TripIt({ username: "offline", password: "offline" });
 	const key = kind === "car" ? "CarObject" : "LodgingObject";
@@ -207,3 +207,21 @@ test("hotel updates pad single-digit hours and reject invalid times", async () =
 		f.client.updateHotel({ uuid, checkOutTime: "25:00" }),
 	).rejects.toThrow("HH:MM");
 });
+
+for (const kind of ["car", "lodging"] as const) {
+	test(`${kind}: UUID case variants share the canonical numeric-ID lock`, async () => {
+		for (const second of [uuid, "123"]) {
+			const f = fixture(kind);
+			const update =
+				kind === "car"
+					? f.client.updateCar.bind(f.client)
+					: f.client.updateHotel.bind(f.client);
+			await Promise.all([
+				update({ id: uuid.toUpperCase(), notes: "edited" }),
+				update({ id: second, supplierConfNum: "NEW" }),
+			]);
+			expect(f.object.notes).toBe("edited");
+			expect(f.object.supplier_conf_num).toBe("NEW");
+		}
+	});
+}

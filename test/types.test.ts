@@ -8,6 +8,7 @@ test("public reservation types expose preserved common metadata", () => {
 		booking_site_conf_num: "CONF",
 		booking_site_name: "Synthetic",
 		booking_site_phone: "+1 202 555 0100",
+		booking_site_email_address: "synthetic@example.com",
 		booking_site_url: "https://example.com",
 		record_locator: "RECORD",
 		supplier_contact: "Synthetic",

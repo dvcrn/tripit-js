@@ -14,6 +14,7 @@ const RESERVATION_FIELDS = [
 	"booking_site_conf_num",
 	"booking_site_name",
 	"booking_site_phone",
+	"booking_site_email_address",
 	"booking_site_url",
 	"record_locator",
 	"supplier_conf_num",

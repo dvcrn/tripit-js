@@ -155,6 +155,7 @@ export interface ReservationObject {
 	booking_site_conf_num?: string;
 	booking_site_name?: string;
 	booking_site_phone?: string;
+	booking_site_email_address?: string;
 	booking_site_url?: string;
 	record_locator?: string;
 	supplier_contact?: string;

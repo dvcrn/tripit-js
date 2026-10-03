@@ -499,3 +499,26 @@ test("hotel/car cancellation timestamps survive edits and document removal in sc
 		);
 	}
 });
+
+test("booking-site email is preserved between phone and URL", () => {
+	for (const kind of ["car", "lodging"] as const) {
+		const out = mergeReplace(
+			kind,
+			{
+				uuid: "test-1",
+				booking_site_phone: "+1 202 555 0100",
+				booking_site_email_address: "synthetic@example.com",
+				booking_site_url: "https://example.com",
+			},
+			{ notes: "edited" },
+		);
+		assert.equal(out.booking_site_email_address, "synthetic@example.com");
+		assert.deepEqual(Object.keys(out), [
+			"uuid",
+			"booking_site_phone",
+			"booking_site_email_address",
+			"booking_site_url",
+			"notes",
+		]);
+	}
+});

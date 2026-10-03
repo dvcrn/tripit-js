@@ -187,7 +187,7 @@ try {
 		assert.deepEqual(stable(after), stable(expected));
 		await Promise.all([
 			update({ notes: "edited" }),
-			update({ supplierConfNum: "SYN-EDIT" }),
+			update({ uuid: id.toUpperCase(), supplierConfNum: "SYN-EDIT" }),
 		]);
 		assert.equal((await get()).notes, "edited");
 		assert.equal((await get()).supplier_conf_num, "SYN-EDIT");
