@@ -149,3 +149,32 @@ console.log(created.Trip.uuid);
 `clientId` is optional. If omitted, the library uses the public TripIt mobile app client ID by default.
 
 The package also exports types from `src/types.ts`.
+
+### Car rentals and partial reservation updates
+
+`TripIt` supports `getCar(id)`, `createCar(params)`, `updateCar(params)` and
+`deleteCar(id)`. `createCar` requires `tripId`, `supplierName`, `pickupDate` and
+`dropoffDate`; optional pickup/dropoff times, timezones, addresses, location
+names, `displayName`, `supplierConfNum`, `carType`, `carDescription`, `notes` and
+`totalCost` describe the reservation.
+
+Hotel and car updates preserve omitted fields, including custom display names
+and documents. `undefined` and empty strings leave values unchanged; `null`
+explicitly clears a field. `tripId: null` is rejected; a reservation must remain associated with a trip. Clearing required fields may be rejected by TripIt.
+`updateHotel` also accepts `phone` and `displayName`. Unknown returned fields
+abort an update rather than risk losing data.
+
+`attachDocument` and `removeDocument` accept `objectType: "car"`, or detect the
+object type when omitted. Hotel/car edits and document changes serialize within
+one process. Concurrent edits in other processes or the TripIt app remain subject
+to TripIt's whole-object replacement behavior. Other reservation types retain
+their existing update behavior.
+
+Adapted from [John P White (@diverdown1964)'s contribution](https://github.com/dvcrn/mcp-server-tripit/pull/2).
+
+Run offline regressions with `bun test`. The opt-in integration harness is
+`test/live/reservations.ts`; run it with a fresh temporary `HOME`, configured
+TripIt credentials, `TRIPIT_LIVE_TEST=1`, and `TRIPIT_DEV_IDENTITY` set to the
+confirmed dev profile email, screen name or UUID. It creates synthetic
+reservations, verifies edits and documents, then deletes and checks every object.
+Any assertion or cleanup failure fails the run.
