@@ -2,7 +2,7 @@
 
 Based on John P White (@diverdown1964)'s [MCP PR #2](https://github.com/dvcrn/mcp-server-tripit/pull/2), source commit `17530a655da61cfc70d617d0caa2daa0f0a07d44`.
 
-Validated with Bun 1.3.10, TypeScript 5.9.3, Biome 2.3.11 and the committed `bun.lock`.
+Use Bun 1.3.10 and the committed `bun.lock`; `mise run build` uses Biome 2.3.11.
 
 ```sh
 bun install --frozen-lockfile
@@ -33,22 +33,6 @@ Remove that temporary HOME after the run. The harness creates only synthetic
 objects in a dedicated trip and exits unsuccessfully on any assertion or cleanup
 failure. It uses a valid generated PDF for document uploads.
 
-On 2026-10-03, the configured dev-marked profile was authenticated with a fresh
-cache and bound by UUID. Live car and hotel creation, read-back, partial edits,
-concurrent edits, null/empty semantics, custom names, PDF attachment, document
-preservation, auto-detection, selective removal and last-document removal passed.
-Both reservations and their parent trip were deleted and verified absent.
-Earlier failed fixture runs also completed and verified cleanup. No package was
-published. The in-process lock cannot prevent edits from other processes or the
-TripIt application; activity/air/transport update preservation is outside this change.
-
-CancellationDateTime preservation is covered with deterministic returned-object fixtures.
-The dev API accepted a synthetic cancellation timestamp but did not return it, so
-live cancellation round-trip behavior remains unverified. That seed run deleted
-and verified both reservations and its trip. Public hotel phone and hotel/car
-custom names are asserted against their requested values before preservation checks.
-
-Agency regression fixtures cover edits and document changes for cars and hotels,
-read-only partner ID removal, unknown nested fields, and schema ordering. Public
-response datetime tests allow date-only and partial values. The live harness seeds
-synthetic Agency metadata and includes it in subsequent preservation comparisons.
+The live suite covers car/hotel creation, partial and concurrent edits, Agency
+metadata, custom names, clearing semantics, and document attachment/removal.
+Cancellation timestamp preservation has offline coverage only.

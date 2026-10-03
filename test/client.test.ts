@@ -143,6 +143,9 @@ test("car create/get/delete use the correct endpoints and preserve timezone inde
 		pickupTime: "9:05",
 		pickupTimezone: "Europe/London",
 	});
+	expect(f.object.supplier_name).toBe("Synthetic");
+	expect(f.object.StartDateTime.date).toBe("2030-01-01");
+	expect(f.object.EndDateTime.date).toBe("2030-01-02");
 	expect(f.object.StartDateTime.time).toBe("09:05:00");
 	expect(f.object.EndDateTime.timezone).toBe("Europe/London");
 	expect(f.object.trip_id).toBe("123");
@@ -225,3 +228,18 @@ for (const kind of ["car", "lodging"] as const) {
 		}
 	});
 }
+
+test("car creation retains distinct pickup and dropoff timezones", async () => {
+	const f = fixture("car");
+	await f.client.createCar({
+		tripId: "123",
+		supplierName: "Synthetic",
+		pickupDate: "2030-01-01",
+		dropoffDate: "2030-01-02",
+		timezone: "Etc/UTC",
+		pickupTimezone: "Europe/London",
+		dropoffTimezone: "Europe/Paris",
+	});
+	expect(f.object.StartDateTime.timezone).toBe("Europe/London");
+	expect(f.object.EndDateTime.timezone).toBe("Europe/Paris");
+});

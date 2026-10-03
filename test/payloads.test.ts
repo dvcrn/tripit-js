@@ -9,7 +9,7 @@ import {
 	writable,
 } from "../src/reservation-payloads.ts";
 
-// The shape TripIt returns for a car (taken from a real CarObject, values made up).
+// Synthetic car response with writable and server-computed fields.
 const CAR = {
 	uuid: "aaaaaaaa-0000-9000-0004-000000000001",
 	trip_uuid: "bbbbbbbb-0000-9000-0001-000000000001",
@@ -179,8 +179,6 @@ test("read-only fields are never sent back", () => {
 });
 
 test("a custom display_name and is_client_traveler are kept; an auto-generated name is not", () => {
-	// Live, 2026-10-02: a replace without display_name reverted a custom car name to the generated
-	// one, and TripIt accepts is_client_traveler on replace.
 	const custom = mergeReplace(
 		"car",
 		{ ...CAR, display_name: "Our Jeep", is_display_name_auto_generated: false },
@@ -189,7 +187,7 @@ test("a custom display_name and is_client_traveler are kept; an auto-generated n
 	assert.equal(custom.display_name, "Our Jeep");
 	assert.equal(custom.is_client_traveler, "true");
 	assert.ok(!("display_name" in (mergeReplace("car", CAR, {}) as any))); // CAR's name is auto-generated
-	const renamed = mergeReplace("car", CAR, { display_name: "Renamed" }) as any; // an explicit change wins
+	const renamed = mergeReplace("car", CAR, { display_name: "Renamed" }) as any;
 	assert.equal(renamed.display_name, "Renamed");
 });
 
@@ -325,7 +323,7 @@ test("remainingImages follows the library's selection rules", () => {
 	assert.deepEqual(remainingImages(imgs, { caption: "two" }), [imgs[0]]);
 	assert.deepEqual(remainingImages(imgs, { index: 1 }), [imgs[1]]);
 	assert.deepEqual(remainingImages(imgs, { all: true }), []);
-	assert.deepEqual(remainingImages(imgs[0], { uuid: "a" }), []); // a single image is not wrapped
+	assert.deepEqual(remainingImages(imgs[0], { uuid: "a" }), []);
 	assert.throws(
 		() => remainingImages(imgs, { uuid: "zz" }),
 		/No document found with UUID zz/,
@@ -369,7 +367,6 @@ test("a nested field the builder does not know refuses too; known read-only nest
 		/Driver\.loyalty_tier/,
 	);
 	assert.doesNotThrow(() => mergeReplace("car", CAR, {})); // utc_offset, is_timezone_manual, latitude, longitude are known
-	// TripIt's computed risk rating on an address (seen live on a hotel address).
 	const rated = mergeReplace(
 		"car",
 		{
@@ -396,15 +393,15 @@ test("operations on the same object run one at a time; different objects do not 
 		withObjectLock("car:2", step("c", 1)),
 	]);
 	assert.deepEqual(results, ["a", "b", "c"]);
-	assert.ok(log.indexOf("a end") < log.indexOf("b start"), log.join(", ")); // b waited for a
-	assert.ok(log.indexOf("c end") < log.indexOf("a end"), log.join(", ")); // c did not
+	assert.ok(log.indexOf("a end") < log.indexOf("b start"), log.join(", "));
+	assert.ok(log.indexOf("c end") < log.indexOf("a end"), log.join(", "));
 	await assert.rejects(
 		withObjectLock("car:1", async () => {
 			throw new Error("boom");
 		}),
 		/boom/,
 	);
-	assert.equal(await withObjectLock("car:1", async () => "after"), "after"); // a failure does not jam the lock
+	assert.equal(await withObjectLock("car:1", async () => "after"), "after");
 });
 
 test("both boolean and string false preserve custom names", () => {
