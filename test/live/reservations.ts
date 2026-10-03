@@ -146,6 +146,26 @@ try {
 		})
 	).LodgingObject;
 	created.push({ kind: "lodging", id: hotel.uuid });
+	// Seed API-supported metadata that has no public convenience setter.
+	const agency = {
+		agency_name: "Synthetic agency",
+		agency_conf_num: "SYN-AGENCY",
+		agency_phone: "+1 202 555 0101",
+	};
+	for (const { kind, id } of created) {
+		await (client as any).mutateReservation(kind, id, () => ({
+			Agency: agency,
+		}));
+		const object =
+			kind === "car"
+				? (await client.getCar(id)).CarObject
+				: (await client.getHotel(id)).LodgingObject;
+		assert.equal(object.Agency?.agency_name, agency.agency_name);
+		assert.equal(object.Agency?.agency_conf_num, agency.agency_conf_num);
+	}
+	console.log(
+		"PASS Agency metadata seeded and read back for both reservations",
+	);
 	console.log("RUN hotel phone and custom-name edit");
 	await client.updateHotel({
 		uuid: hotel.uuid,

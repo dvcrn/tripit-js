@@ -27,6 +27,7 @@ const RESERVATION_FIELDS = [
 	"notes",
 	"restrictions",
 	"total_cost",
+	"Agency",
 ] as const;
 
 export const CAR_FIELDS: readonly string[] = [
@@ -83,6 +84,15 @@ const READ_ONLY_FIELDS = new Set([
 	"ReservationHolder",
 ]);
 
+const AGENCY_KEYS = [
+	"agency_conf_num",
+	"agency_name",
+	"agency_client_name",
+	"agency_phone",
+	"agency_email_address",
+	"agency_url",
+	"agency_contact",
+];
 const DATETIME_KEYS = ["date", "time", "timezone"];
 const ADDRESS_KEYS = [
 	"address",
@@ -110,7 +120,9 @@ const DATETIME_FIELDS = new Set([
 ]);
 // Nested keys TripIt returns, writable or read-only (utc_offset and is_timezone_manual it computes;
 // coordinates it geocodes). Any other nested key refuses the update, like an unknown top-level one.
-const NESTED_KNOWN: Record<string, Set<string>> = {};
+const NESTED_KNOWN: Record<string, Set<string>> = {
+	Agency: new Set([...AGENCY_KEYS, "partner_agency_id"]),
+};
 const ADDRESS_FIELDS = new Set([
 	"Address",
 	"StartLocationAddress",
@@ -163,6 +175,7 @@ function pick(
 }
 
 function writableValue(field: string, value: unknown): unknown {
+	if (field === "Agency" && isPlain(value)) return pick(value, AGENCY_KEYS);
 	if (DATETIME_FIELDS.has(field) && isPlain(value)) {
 		return pick(value, DATETIME_KEYS, (k, v) =>
 			k === "time" ? normalizeTime(v as string | undefined) : v,

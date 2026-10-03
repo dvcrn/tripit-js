@@ -196,8 +196,8 @@ test("a custom display_name and is_client_traveler are kept; an auto-generated n
 test("a field the builder does not know refuses the update instead of wiping it", () => {
 	assert.throws(
 		() =>
-			mergeReplace("car", { ...CAR, Agency: { agency_name: "Expedia" } }, {}),
-		/Agency/,
+			mergeReplace("car", { ...CAR, UnknownReservationField: "synthetic" }, {}),
+		/UnknownReservationField/,
 	);
 	assert.throws(
 		() =>
@@ -522,3 +522,50 @@ test("booking-site email is preserved between phone and URL", () => {
 		]);
 	}
 });
+
+for (const kind of ["car", "lodging"] as const) {
+	test(`${kind} preserves writable Agency fields during edits and document changes`, () => {
+		const Agency = {
+			agency_conf_num: "CONF",
+			agency_name: "Synthetic agency",
+			agency_client_name: "Synthetic client",
+			agency_phone: "+1 202 555 0100",
+			agency_email_address: "test@example.com",
+			agency_url: "https://example.com",
+			agency_contact: "Synthetic contact",
+		};
+		const existing = {
+			uuid: "synthetic",
+			Agency: { ...Agency, partner_agency_id: "123" },
+			Image: [{ uuid: "doc" }],
+			StartDateTime: { date: "2030-01-01" },
+		};
+		for (const patch of [
+			{ notes: "Edited" },
+			{ Image: [{ uuid: "doc" }, { uuid: "doc2" }] },
+			{ Image: null },
+		]) {
+			const out = mergeReplace(kind, existing, patch);
+			assert.deepEqual(out.Agency, Agency);
+			assert.ok(
+				Object.keys(out).indexOf("Agency") <
+					Object.keys(out).indexOf("StartDateTime"),
+			);
+		}
+		assert.deepEqual(
+			mergeReplace(kind, existing, { Agency: { agency_phone: null } }).Agency,
+			Object.fromEntries(
+				Object.entries(Agency).filter(([key]) => key !== "agency_phone"),
+			),
+		);
+		assert.throws(
+			() =>
+				mergeReplace(
+					kind,
+					{ ...existing, Agency: { ...Agency, unknown: "x" } },
+					{},
+				),
+			/Agency.unknown/,
+		);
+	});
+}

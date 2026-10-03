@@ -47,3 +47,8 @@ The dev API accepted a synthetic cancellation timestamp but did not return it, s
 live cancellation round-trip behavior remains unverified. That seed run deleted
 and verified both reservations and its trip. Public hotel phone and hotel/car
 custom names are asserted against their requested values before preservation checks.
+
+Agency regression fixtures cover edits and document changes for cars and hotels,
+read-only partner ID removal, unknown nested fields, and schema ordering. Public
+response datetime tests allow date-only and partial values. The live harness seeds
+synthetic Agency metadata and includes it in subsequent preservation comparisons.

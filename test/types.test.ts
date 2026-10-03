@@ -30,3 +30,19 @@ test("public reservation types expose preserved common metadata", () => {
 	expect(car.booking_site_conf_num).toBe(hotel.booking_site_conf_num);
 	expect(car.CancellationDateTime).toEqual(hotel.CancellationDateTime);
 });
+
+test("response datetimes support date-only and partial values", () => {
+	const car: CarObject = {
+		uuid: "synthetic",
+		StartDateTime: { date: "2030-01-01" },
+		EndDateTime: { date: "2030-01-02" },
+		Agency: { agency_name: "Synthetic" },
+	};
+	const hotel: LodgingObject = {
+		uuid: "synthetic",
+		CancellationDateTime: { time: "09:00:00" },
+	};
+	expect(car.StartDateTime?.time).toBeUndefined();
+	expect(car.EndDateTime?.timezone).toBeUndefined();
+	expect(hotel.CancellationDateTime?.date).toBeUndefined();
+});

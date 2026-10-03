@@ -36,9 +36,9 @@ export interface WarningContainer {
 }
 
 export interface DateTimeValue {
-	date: string;
-	time: string;
-	timezone: string;
+	date?: string;
+	time?: string;
+	timezone?: string;
 	utc_offset?: string;
 	is_timezone_manual?: string;
 }
@@ -148,7 +148,19 @@ export interface TravelerValue {
 	ticket_num?: string;
 }
 
+export interface AgencyValue {
+	agency_conf_num?: string;
+	agency_name?: string;
+	agency_client_name?: string;
+	agency_phone?: string;
+	agency_email_address?: string;
+	agency_url?: string;
+	agency_contact?: string;
+	partner_agency_id?: string;
+}
+
 export interface ReservationObject {
+	Agency?: AgencyValue;
 	id?: string;
 	CancellationDateTime?: DateTimeValue;
 	booking_date?: string;
