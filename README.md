@@ -172,9 +172,26 @@ their existing update behavior.
 
 Adapted from [John P White (@diverdown1964)'s contribution](https://github.com/dvcrn/mcp-server-tripit/pull/2).
 
-Run offline regressions with `bun test`. The opt-in integration harness is
-`test/live/reservations.ts`; run it with a fresh temporary `HOME`, configured
-TripIt credentials, `TRIPIT_LIVE_TEST=1`, and `TRIPIT_DEV_IDENTITY` set to the
-confirmed dev profile email, screen name or UUID. It creates synthetic
-reservations, verifies edits and documents, then deletes and checks every object.
-Any assertion or cleanup failure fails the run.
+### Development checks
+
+Use Bun 1.3.10 and the committed lockfile:
+
+```sh
+bun install --frozen-lockfile
+bun test
+bun run check
+mise run build
+```
+
+Live tests require configured credentials and `TRIPIT_DEV_IDENTITY` set to the
+confirmed dev profile email, screen name or UUID. Use a fresh token cache:
+
+```sh
+tripit_test_home=$(mktemp -d)
+fnox x -- env HOME="$tripit_test_home" TRIPIT_LIVE_TEST=1 bun test/live/reservations.ts
+```
+
+The harness creates synthetic reservations and verifies their deletion. Assertion
+or cleanup failures fail the run. Remove the temporary HOME afterward; never
+commit credentials, token caches, or raw responses. Cancellation timestamp
+preservation has offline coverage only.
