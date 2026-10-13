@@ -4,12 +4,12 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/dvcrn/tripit.git"
+		"url": "git+https://github.com/dvcrn/tripit-js.git"
 	},
 	"bugs": {
-		"url": "https://github.com/dvcrn/tripit/issues"
+		"url": "https://github.com/dvcrn/tripit-js/issues"
 	},
-	"homepage": "https://github.com/dvcrn/tripit#readme",
+	"homepage": "https://github.com/dvcrn/tripit-js#readme",
 	"scripts": {
 		"build:lib": "mkdir -p ./dist && bun build ./src/index.ts --outfile ./dist/index.js --target node",
 		"build:cli": "mkdir -p ./dist && bun build ./index.ts --outfile ./dist/tripit.js --target node --banner '#!/usr/bin/env node'",
