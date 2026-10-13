@@ -1,127 +1,15 @@
-# tripit-cli (and library) for JS
+# tripit
 
-`tripit` works as both:
-
-- a CLI (`tripit ...`)
-- a JavaScript package (`import TripIt from "tripit"`)
-
-## Install
-
-Library:
+JavaScript client and CLI for the [TripIt](https://www.tripit.com/) API.
 
 ```bash
-npm install tripit
+npm install tripit          # library
+npm install -g tripit       # CLI
 ```
 
-CLI:
+Authenticate with `TRIPIT_USERNAME` and `TRIPIT_PASSWORD`. `clientId` is optional and defaults to the public TripIt mobile app client ID.
 
-```bash
-npm install -g tripit
-```
-
-## CLI
-
-Show available commands:
-
-```bash
-tripit --help
-```
-
-### Agent Skill Installation
-
-Install with `npx skills`:
-
-```bash
-npx skills add dvcrn/tripit
-npx skills add dvcrn/tripit --full-depth --list
-```
-
-Install with Claude plugin marketplace CLI:
-
-```bash
-claude plugin marketplace add dvcrn/tripit
-claude plugin install tripit@dvcrn-tripit --scope user
-```
-
-If the marketplace is already configured, update before reinstall tests:
-
-```bash
-claude plugin marketplace update dvcrn-tripit
-claude plugin install tripit@dvcrn-tripit --scope user
-```
-
-Claude UI flow:
-
-1. Open Claude plugin marketplace UI.
-2. Add or select `dvcrn/tripit`.
-3. Install plugin `tripit` from marketplace `dvcrn-tripit`.
-
-### Common Workflow
-
-1. Authenticate:
-
-```bash
-tripit login
-```
-
-2. Create a trip:
-
-```bash
-tripit trips create --name "Test Trip" --start 2026-03-20 --end 2026-03-23 --location "Tokyo" -o json
-```
-
-3. List and inspect the trip:
-
-```bash
-tripit trips list
-tripit trips get <TRIP_UUID>
-```
-
-4. Add reservations/activities:
-
-```bash
-tripit hotels create --trip <TRIP_UUID> --name "Test Hotel" --checkin 2026-03-20 --checkout 2026-03-23 --checkin-time 15:00 --checkout-time 11:00 --timezone UTC --address "1 Market St" --city "San Francisco" --country US -o json
-
-tripit flights create --trip <TRIP_UUID> --name "Test Flight" --airline "Example Air" --from "San Francisco" --from-code US --to "Seattle" --to-code US --airline-code EA --flight-num 123 --depart-date 2026-03-20 --depart-time 10:00 --depart-tz UTC --arrive-date 2026-03-20 --arrive-time 14:00 --arrive-tz UTC -o json
-
-tripit transport create --trip <TRIP_UUID> --from "1 Market St" --to "SFO Airport" --depart-date 2026-03-20 --depart-time 08:00 --arrive-date 2026-03-20 --arrive-time 09:00 --timezone UTC --name "Hotel to Airport" -o json
-
-tripit activities create --trip <TRIP_UUID> --name "Dinner" --start-date 2026-03-20 --start-time 19:00 --end-date 2026-03-20 --end-time 21:00 --timezone UTC --address "200 Example St" --location-name "Downtown" -o json
-```
-
-5. Update resources:
-
-```bash
-tripit trips update <TRIP_UUID> --name "Updated Test Trip"
-tripit hotels update <HOTEL_UUID> --name "Updated Hotel"
-tripit flights update <FLIGHT_UUID> --name "Updated Flight"
-tripit transport update <TRANSPORT_UUID> --name "Updated Transport"
-tripit activities update <ACTIVITY_UUID> --name "Updated Activity"
-```
-
-6. Attach and remove documents (images/PDFs):
-
-```bash
-tripit documents attach <HOTEL_UUID> --file ./confirmation.pdf --caption "Booking Confirmation"
-tripit documents attach <HOTEL_UUID> --file ./photo.png --type lodging
-tripit documents remove <HOTEL_UUID> --caption "Booking Confirmation"
-tripit documents remove <HOTEL_UUID> --index 1
-tripit documents remove <HOTEL_UUID> --all
-```
-
-The `--type` flag (lodging, activity, air, transport) is auto-detected from the UUID when omitted.
-
-7. Delete resources:
-
-```bash
-tripit activities delete <ACTIVITY_UUID>
-tripit transport delete <TRANSPORT_UUID>
-tripit flights delete <FLIGHT_UUID>
-tripit hotels delete <HOTEL_UUID>
-tripit trips delete <TRIP_UUID>
-```
-
-## Library Usage
+## SDK
 
 ```ts
 import TripIt from "tripit";
@@ -133,65 +21,89 @@ const client = new TripIt({
 
 await client.authenticate();
 
-const list = await client.listTrips(20, 1, false);
-console.log(list.Trip);
+const trips = await client.listTrips();
 
-const created = await client.createTrip({
-  displayName: "SDK Trip Example",
+const trip = await client.createTrip({
+  displayName: "Tokyo",
   startDate: "2026-04-01",
   endDate: "2026-04-04",
-  primaryLocation: "New York",
+  primaryLocation: "Tokyo",
+});
+const tripId = trip.Trip.uuid;
+```
+
+Add reservations to that trip:
+
+```ts
+const hotel = await client.createHotel({
+  tripId,
+  hotelName: "Example Hotel",
+  checkInDate: "2026-04-01",
+  checkInTime: "15:00",
+  checkOutDate: "2026-04-04",
+  checkOutTime: "11:00",
+  timezone: "Asia/Tokyo",
+  street: "1-1 Example",
+  city: "Tokyo",
+  country: "JP",
 });
 
-console.log(created.Trip.uuid);
+await client.createFlight({
+  tripId,
+  displayName: "SFO to HND",
+  supplierName: "Example Air",
+  segments: [
+    {
+      startDate: "2026-04-01",
+      startTime: "11:00",
+      startTimezone: "America/Los_Angeles",
+      endDate: "2026-04-02",
+      endTime: "15:00",
+      endTimezone: "Asia/Tokyo",
+      startCityName: "San Francisco",
+      startCountryCode: "US",
+      endCityName: "Tokyo",
+      endCountryCode: "JP",
+      marketingAirline: "EA",
+      marketingFlightNumber: "123",
+    },
+  ],
+});
+
+await client.createCar({
+  tripId,
+  supplierName: "Example Rentals",
+  pickupDate: "2026-04-01",
+  dropoffDate: "2026-04-04",
+  timezone: "Asia/Tokyo",
+});
 ```
 
-`clientId` is optional. If omitted, the library uses the public TripIt mobile app client ID by default.
+Hotel and car updates keep omitted fields, including custom names and documents. `undefined` and `""` leave a value unchanged; `null` clears it. `tripId: null` is rejected.
 
-The package also exports types from `src/types.ts`.
+```ts
+await client.updateHotel({
+  uuid: hotel.LodgingObject.uuid,
+  displayName: "Updated Hotel",
+  notes: null,
+});
 
-### Car rentals and partial reservation updates
-
-`TripIt` supports `getCar(id)`, `createCar(params)`, `updateCar(params)` and
-`deleteCar(id)`. `createCar` requires `tripId`, `supplierName`, `pickupDate` and
-`dropoffDate`; optional pickup/dropoff times, timezones, addresses, location
-names, `displayName`, `supplierConfNum`, `carType`, `carDescription`, `notes` and
-`totalCost` describe the reservation.
-
-Hotel and car updates preserve omitted fields, including custom display names
-and documents. `undefined` and empty strings leave values unchanged; `null`
-explicitly clears a field. `tripId: null` is rejected; a reservation must remain associated with a trip. Clearing required fields may be rejected by TripIt.
-`updateHotel` also accepts `phone` and `displayName`. Unknown returned fields
-abort an update rather than risk losing data.
-
-`attachDocument` and `removeDocument` accept `objectType: "car"`, or detect the
-object type when omitted. Hotel/car edits and document changes serialize within
-one process. Concurrent edits in other processes or the TripIt app remain subject
-to TripIt's whole-object replacement behavior. Other reservation types retain
-their existing update behavior.
-
-Adapted from [John P White (@diverdown1964)'s contribution](https://github.com/dvcrn/mcp-server-tripit/pull/2).
-
-### Development checks
-
-Use Bun 1.3.10 and the committed lockfile:
-
-```sh
-bun install --frozen-lockfile
-bun test
-bun run check
-mise run build
+await client.attachDocument({
+  objectId: hotel.LodgingObject.uuid,
+  filePath: "./confirmation.pdf",
+  caption: "Booking confirmation",
+});
 ```
 
-Live tests require configured credentials and `TRIPIT_DEV_IDENTITY` set to the
-confirmed dev profile email, screen name or UUID. Use a fresh token cache:
+The same `get` / `create` / `update` / `delete` pattern covers trips, hotels, flights, transport, activities, and cars. `objectType` on document calls is optional. Types are exported from the package.
 
-```sh
-tripit_test_home=$(mktemp -d)
-fnox x -- env HOME="$tripit_test_home" TRIPIT_LIVE_TEST=1 bun test/live/reservations.ts
+## CLI
+
+```bash
+tripit login
+tripit trips create --name "Tokyo" --start 2026-04-01 --end 2026-04-04 --location Tokyo
+tripit trips list
+tripit --help
 ```
 
-The harness creates synthetic reservations and verifies their deletion. Assertion
-or cleanup failures fail the run. Remove the temporary HOME afterward; never
-commit credentials, token caches, or raw responses. Cancellation timestamp
-preservation has offline coverage only.
+Use `-o json` when you need machine-readable output.
